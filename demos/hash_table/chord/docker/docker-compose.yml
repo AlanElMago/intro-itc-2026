@@ -1,0 +1,105 @@
+name: chord-demo
+
+services:
+  node0:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_0
+    command: python main.py
+    environment:
+      - PORT=42000
+    ports:
+      - 42000:42000
+    volumes:
+      - ./mounts/node0/logs:/app/logs
+
+  node1:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_1
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node0:42000"
+      - PORT=42001
+    ports:
+      - 42001:42001
+    volumes:
+      - ./mounts/node1/logs:/app/logs
+
+  node2:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_2
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node1:42001"
+      - PORT=42002
+    ports:
+      - 42002:42002
+    volumes:
+      - ./mounts/node2/logs:/app/logs
+
+  node3:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_3
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node1:42001"
+      - PORT=42003
+    ports:
+      - 42003:42003
+    volumes:
+      - ./mounts/node3/logs:/app/logs
+
+  node4:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_4
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node2:42002"
+      - PORT=42004
+    ports:
+      - 42004:42004
+    volumes:
+      - ./mounts/node4/logs:/app/logs
+
+  node5:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_5
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node2:42002"
+      - PORT=42005
+    ports:
+      - 42005:42005
+    volumes:
+      - ./mounts/node5/logs:/app/logs
+
+  node6:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_6
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node3:42003"
+      - PORT=42006
+    ports:
+      - 42006:42006
+    volumes:
+      - ./mounts/node6/logs:/app/logs
+
+  node7:
+    build: ./node
+    image: demo/chord-node
+    container_name: chord_node_7
+    command: python main.py
+    environment:
+      - "JOIN_ADDR=node3:42003"
+      - PORT=42007
+    ports:
+      - 42007:42007
+    volumes:
+      - ./mounts/node7/logs:/app/logs

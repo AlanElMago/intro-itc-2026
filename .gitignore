@@ -1,0 +1,6 @@
+__pycache__
+.venv
+
+*.log
+
+demos/hash_table/chord/docker/mounts/node*/files/*
