@@ -26,23 +26,23 @@ Curso de Introducción a las Ingenierías y Tecnologías Computacionales 2026.
 
 ### 6. Parallel Processeors from Client to Cloud
 
-**6.1** Dependable Memory Hierarchy
+**6.1.** Dependable Memory Hierarchy
 
-**6.2** Black Box Model
+**6.2.** Black Box Model
 
-**6.3** Concurrent Parallelism
+**6.3.** Concurrent Parallelism
 
-**6.4** Parallel Patterns
+**6.4.** Parallel Patterns
 
-**6.5** Patterns for Concurrency
+**6.5.** Patterns for Concurrency
 
-**6.6** Patterns for Parallel Tasks
+**6.6.** Patterns for Parallel Tasks
 
-**6.7** Patterns for Parallel Data
+**6.7.** Patterns for Parallel Data
 
-**6.8** Domain-Specific Architectures
+**6.8.** Domain-Specific Architectures
 
-**6.9** Performance Analysis
+**6.9.** Performance Analysis
 
 # Material Didáctico
 
