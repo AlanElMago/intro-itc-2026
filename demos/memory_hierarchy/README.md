@@ -78,7 +78,7 @@ Solo se usan las funciones locales de kax (`makeShm`, `putDataToShm`, `getDataFr
 | `credentials.json` | Identifica la app ante Google (OAuth client ID) | Lo descargas tú de Google Cloud Console (pasos abajo) |
 | `token.json` | Guarda tu autorización para no abrir el navegador cada vez | Se crea solo la primera vez que ejecutas `python main.py nube` y autorizas |
 
-Ambos van en esta carpeta (`DemoMemoryHerarchyV2/`).
+Ambos van en esta carpeta (`memory_hierarchy/`).
 
 ### Cómo conseguir `credentials.json` (una sola vez)
 1. Entra a [Google Cloud Console](https://console.cloud.google.com/) y crea un proyecto (o elige uno).
@@ -120,4 +120,4 @@ Variables de entorno opcionales: `GDRIVE_CREDENTIALS`, `GDRIVE_TOKEN`, `GDRIVE_F
 ```bash
 rm -f shared_disk_memory/*.bin shared_disk_memory/*.zip output_final/archivo_recuperado_*
 ```
-Los archivos de Drive se borran a mano desde la carpeta `DemoMemoryHerarchyV2`.
+Los archivos de Drive se borran a mano desde la carpeta `memory_hierarchy`.
