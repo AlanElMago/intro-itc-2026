@@ -248,7 +248,7 @@ async def post_key(req: Request) -> JSONResponse:
 
 
 @app.get('/file/{filename}')
-async def get_file(filename: str) -> FileResponse:
+def get_file(filename: str) -> FileResponse:
     filepath = os.path.join('files', filename)
 
     if not os.path.isfile(filepath):
