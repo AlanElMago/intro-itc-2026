@@ -7,11 +7,13 @@ from dataclasses import asdict
 from typing import Final
 
 import httpx
+import kvstore
 import logger
 import uvicorn
 from chord_protocol import Chord
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.exceptions import HTTPException
+from fastapi.responses import FileResponse, JSONResponse
 
 HOSTNAME:  Final[str] = socket.gethostname()
 IP_ADDR:   Final[str] = socket.gethostbyname(HOSTNAME)
@@ -20,7 +22,9 @@ JOIN_ADDR: Final[str] = os.getenv('JOIN_ADDR', f'{IP_ADDR}:{PORT}')
 HASH_ALG:  Final[str] = os.getenv('HASH_ALG', 'sha1')
 NUM_BITS:  Final[int] = 16  # hashing_algorithm().digest_size * 8
 
+
 log   = logging.getLogger('uvicorn.main')
+store = kvstore.KvStore()
 chord = Chord.build(
     ip_addr  = IP_ADDR,
     port     = PORT,
@@ -28,13 +32,29 @@ chord = Chord.build(
     hash_alg = HASH_ALG
 )
 
-
 async def maintenance_loop(client: httpx.AsyncClient) -> None:
+    pred_address: str = ''
+
     while True:
         try:
-            await chord.check_predecessor(client)
             await chord.stabilize(client)
             await chord.fix_fingers(client)
+            await chord.check_predecessor(client)
+
+            if not chord.predecessor:
+                continue
+
+            if pred_address != chord.predecessor.address \
+                    and chord.predecessor.address != chord.address:
+
+                await store.move_keys(
+                    address    = chord.predecessor.address,
+                    range_func = lambda k: chord.is_key_in_range(k),
+                    client     = client
+                )
+
+                pred_address = chord.predecessor.address
+
         except httpx.HTTPError as e:
             log.warning(f'maintenence failed: {e!r}')
 
@@ -49,16 +69,31 @@ async def lifespan(app: FastAPI):
             max_keepalive_connections = NUM_BITS
         )
     ) as client:
+        if chord.address == JOIN_ADDR:
+            kvstore.register_files_local(
+                kv_store = store,
+                address  = chord.address,
+                hashfunc = lambda s: chord.hashfunc(s)
+            )
+        else:
+            await kvstore.register_files_remote(
+                self_address   = chord.address,
+                target_address = JOIN_ADDR,
+                client         = client
+            )
+
         app.state.http = client
         await chord.join_ring(address=JOIN_ADDR, client=client)
         task = asyncio.create_task(maintenance_loop(client))
-        log.info(f'server listening on port {PORT}')
+
+        log.info(f'server listening on port {PORT} with chord id {chord.id}')
 
         yield
 
         log.info('server shutting down...')
         task.cancel()
         # await chord.leave_ring(client)
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -87,7 +122,6 @@ def info() -> JSONResponse:
         }
     )
 
-
 @app.get('/info/fingers')
 def info_fingers() -> JSONResponse:
     return JSONResponse(
@@ -98,6 +132,15 @@ def info_fingers() -> JSONResponse:
                 'end':   finger.end,
                 'node':  asdict(finger.node)
             } for idx, finger in enumerate(chord._fingers)
+        }
+    )
+
+@app.get('/info/kvstore')
+def info_kvstore() -> JSONResponse:
+    return JSONResponse(
+        status_code = status.HTTP_200_OK,
+        content     = {
+            str(key): asdict(record) for key, record in store._kv.items()
         }
     )
 
@@ -135,6 +178,86 @@ async def notify(req: Request) -> JSONResponse:
         status_code = status.HTTP_200_OK,
         content     = {'status': 'ok'}
     )
+
+
+@app.get('/key/{key}')
+async def get_key(req: Request, key: int) -> JSONResponse:
+    if chord.is_key_in_range(key):
+        record = store.get(key)
+
+        if record is None:
+            return JSONResponse(
+                status_code = status.HTTP_404_NOT_FOUND,
+                content     = {'status': 'not found'}
+            )
+
+        return JSONResponse(
+            status_code = status.HTTP_200_OK,
+            content     = asdict(record)
+        )
+
+    node = chord.closest_preceding_finger(target_id=key)
+
+    if node.address == chord.address:
+        url = f'http://{chord.successor.address}/key/{key}'
+    else:
+        url = f'http://{node.address}/key/{key}'
+
+    client: httpx.AsyncClient = req.app.state.http
+    res = await client.get(url)
+
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+@app.get('/key/by-filename/{filename}')
+async def get_key_by_filename(req: Request, filename: str) -> JSONResponse:
+    key = chord.hashfunc(filename.encode())
+
+    return await get_key(req, key)
+
+@app.post('/key')
+async def post_key(req: Request) -> JSONResponse:
+    body = await req.json()
+
+    filename: str = body['filename']
+    address:  str = body['address']
+
+    key = chord.hashfunc(filename.encode())
+
+    if chord.is_key_in_range(key):
+        store.put(key, kvstore.KvRecord(filename, address))
+
+        return JSONResponse(
+            status_code = status.HTTP_201_CREATED,
+            content     = {'status': 'created'}
+        )
+
+    node = chord.closest_preceding_finger(target_id=key)
+
+    if node.address == chord.address:
+        url = f'http://{chord.successor.address}/key'
+    else:
+        url = f'http://{node.address}/key'
+
+    client: httpx.AsyncClient = req.app.state.http
+    res  = await client.post(
+        url  = url,
+        json = {'filename': filename, 'address': address}
+    )
+
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+@app.get('/file/{filename}')
+async def get_file(filename: str) -> FileResponse:
+    filepath = os.path.join('files', filename)
+
+    if not os.path.isfile(filepath):
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail      = f'file {filename} not found'
+        )
+
+    return FileResponse(filepath, media_type='application/octet-stream')
 
 
 if __name__ == '__main__':

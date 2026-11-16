@@ -74,6 +74,17 @@ class Chord:
             ).digest()
         ) % self._modulo
 
+    def is_key_in_range(self, key: int) -> bool:
+        if self.predecessor is None:
+            return True
+
+        return is_id_in_range(
+            id     = key,
+            start  = self.predecessor.id + 1,
+            end    = self.id,
+            modulo = self._modulo
+        )
+
     def closest_preceding_finger(self, target_id: int) -> Node:
         for i in range(self._num_bits - 1, -1, -1):
             if is_id_in_range(

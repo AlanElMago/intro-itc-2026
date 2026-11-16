@@ -10,14 +10,15 @@ services:
       - PORT=42000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42000/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42000:42000
     volumes:
       - ./mounts/node0/logs:/app/logs
+      - ./mounts/node0/files:/app/files
 
   node1:
     build: ./node
@@ -29,14 +30,15 @@ services:
       - PORT=42001
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42001/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42001:42001
     volumes:
       - ./mounts/node1/logs:/app/logs
+      - ./mounts/node1/files:/app/files
     depends_on:
       node0:
         condition: service_healthy
@@ -51,14 +53,15 @@ services:
       - PORT=42002
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42002/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42002:42002
     volumes:
       - ./mounts/node2/logs:/app/logs
+      - ./mounts/node2/files:/app/files
     depends_on:
       node1:
         condition: service_healthy
@@ -73,14 +76,15 @@ services:
       - PORT=42003
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42003/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42003:42003
     volumes:
       - ./mounts/node3/logs:/app/logs
+      - ./mounts/node3/files:/app/files
     depends_on:
       node2:
         condition: service_healthy
@@ -95,14 +99,15 @@ services:
       - PORT=42004
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42004/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42004:42004
     volumes:
       - ./mounts/node4/logs:/app/logs
+      - ./mounts/node4/files:/app/files
     depends_on:
       node3:
         condition: service_healthy
@@ -117,14 +122,15 @@ services:
       - PORT=42005
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42005/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42005:42005
     volumes:
       - ./mounts/node5/logs:/app/logs
+      - ./mounts/node5/files:/app/files
     depends_on:
       node4:
         condition: service_healthy
@@ -139,14 +145,15 @@ services:
       - PORT=42006
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42006/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42006:42006
     volumes:
       - ./mounts/node6/logs:/app/logs
+      - ./mounts/node6/files:/app/files
     depends_on:
       node5:
         condition: service_healthy
@@ -161,14 +168,15 @@ services:
       - PORT=42007
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42007/health')"]
-      start_period: 5s
+      start_period: 11s
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 3
     ports:
       - 42007:42007
     volumes:
       - ./mounts/node7/logs:/app/logs
+      - ./mounts/node7/files:/app/files
     depends_on:
       node6:
         condition: service_healthy
