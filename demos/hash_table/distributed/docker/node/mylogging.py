@@ -21,7 +21,7 @@ CONFIG: Final[dict] = {
     'filters': {
         'exclude_paths': {
             '()': 'mylogging.ExcludePaths',
-            'paths': ['/health', '/notify', '/predecessor'],
+            'paths': ['/health', '/notify', '/predecessor', '/logs'],
         },
     },
     'handlers': {
