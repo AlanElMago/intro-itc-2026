@@ -198,7 +198,7 @@ class DistributedHashTable:
             await self._remove(key)
 
     async def _sync_pred_logs_loop(self):
-        while not self._chord.should_exit.wait(timeout=5.0):
+        while not self._chord.should_exit.wait(timeout=1.0):
             try:
                 await self._sync_pred_logs()
             except httpx.HTTPError as e:
