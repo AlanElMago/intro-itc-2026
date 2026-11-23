@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import logging.config
 import os
@@ -26,6 +27,14 @@ FILES_DIR = Path(__file__).parent / 'files'
 
 
 
+parser = argparse.ArgumentParser(description='Distributed hash table client')
+parser.add_argument(
+    '--join-addr',
+    default = os.environ.get('JOIN_ADDR'),
+    help    = 'Chord address (host:port) of an existing node to join; '
+              'defaults to $JOIN_ADDR, or starts a new ring if unset')
+args = parser.parse_args()
+
 logging.config.dictConfig(mylogging.CONFIG)
 
 kv = {}
@@ -38,7 +47,11 @@ for file in [f for f in Path(FILES_DIR).iterdir() if f.is_file]:
 app = FastAPI()
 log = logging.getLogger('api')
 dht = asyncio.run(
-    DistributedHashTable.build(initial_kv=kv, frontend_address=ADDRESS))
+    DistributedHashTable.build(
+        initial_kv       = kv,
+        frontend_address = ADDRESS,
+        join_address     = args.join_addr
+    ))
 
 
 

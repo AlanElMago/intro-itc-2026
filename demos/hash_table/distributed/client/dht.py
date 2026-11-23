@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import threading
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -12,7 +11,6 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-JOIN_ADDR: Final[str | None] = os.environ.get('JOIN_ADDR')
 HTTP_TIMEOUT: Final[httpx.Timeout] = httpx.Timeout(timeout=1.0)
 
 
@@ -245,13 +243,16 @@ class DistributedHashTable:
     async def build(
         cls,
         initial_kv:       dict[str, str] | None = None,
-        frontend_address: str | None            = None
+        frontend_address: str | None            = None,
+        join_address:     str | None            = None
     ) -> 'DistributedHashTable':
         '''Build a distributed hash table instance.
 
         Args:
             initial_kv: Initial key-value pairs to populate the DHT.
             frontend_address: Frontend address for the DHT node.
+            join_address: Chord address (`host:port`) of an existing node to
+                join, or None to start a new ring.
 
         Returns:
             An instance of DistributedHashTable.
@@ -259,11 +260,11 @@ class DistributedHashTable:
         dht    = cls()
         router = APIRouter()
 
-        join_chord: str | None = JOIN_ADDR
+        join_chord: str | None = join_address
         join_front: str | None = None
 
         if join_chord is not None:
-            req  = await request('GET', f'http://{JOIN_ADDR}/addresses')
+            req  = await request('GET', f'http://{join_chord}/addresses')
             body = req.json()
             join_front = body.get('frontend_address')
 
