@@ -1,0 +1,19 @@
+# Test setup: the client talks to hashtable on localhost:8000.
+services:
+  hashtable:
+    build: ./hash_table
+    ports:
+      - "8000:8000"
+    environment:
+      CLOUD_URL: http://localhost:420000
+    volumes:
+      - ./hashtable/logs:/app/logs
+      - ./hashtable/storage:/app/files
+
+  simplestorage:
+    build: ./simple_storage
+    volumes:
+      - ./storage/logs:/app/logs
+      - ./storage/storage:/app/files
+    depends_on:
+      - hashtable
