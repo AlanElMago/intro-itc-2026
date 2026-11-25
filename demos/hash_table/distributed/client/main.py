@@ -60,14 +60,12 @@ def file_iterator(filepath: Path) -> Generator[bytes, None, None]:
 def info() -> JSONResponse:
     '''Debug information endpoint.'''
     successor = {
-        'hostname': HOSTNAME,
-        'id':       dht._chord.node.successor.id,
-        'address':  dht._chord.node.successor.address,
+        'id':      dht._chord.node.successor.id,
+        'address': dht._chord.node.successor.address,
     }
     predecessor = {
-        'hostname': HOSTNAME,
-        'id':       dht._chord.node.predecessor.id,
-        'address':  dht._chord.node.predecessor.address,
+        'id':      dht._chord.node.predecessor.id,
+        'address': dht._chord.node.predecessor.address,
     } if dht._chord.node.predecessor is not None else {}
 
     content = {
