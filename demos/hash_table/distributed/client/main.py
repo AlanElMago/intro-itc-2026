@@ -14,6 +14,7 @@ from chord import hashfunc
 from dht import DistributedHashTable
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 
 HOSTNAME: Final[str] = socket.gethostname()
 HOST:     Final[str] = config.HOST
@@ -134,23 +135,36 @@ def get_file(filename: str) -> StreamingResponse:
             status_code = status.HTTP_200_OK
         )
 
-    url = f'http://{address}/file/{filename}'
+    url    = f'http://{address}/file/{filename}'
+    client = httpx.Client()
 
     try:
-        with httpx.Client() as c, c.stream('GET', url) as response:
-            if response.status_code == status.HTTP_404_NOT_FOUND:
-                raise not_found
-
-            return StreamingResponse(
-                content     = response.aiter_raw(FILE_STREAM_CHUNK_SIZE),
-                status_code = response.status_code,
-            )
+        response = client.send(client.build_request('GET', url), stream=True)
     except httpx.RequestError as e:
+        client.close()
+
         detail = f'Error forwarding request to {url}'
 
         log.error(f'{detail}: {e}')
 
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail)
+
+    def close_upstream() -> None:
+        response.close()
+        client.close()
+
+    if response.status_code == status.HTTP_404_NOT_FOUND:
+        close_upstream()
+
+        raise not_found
+
+    # The upstream stream must stay open until Starlette finishes sending the
+    # body, so it is closed in a background task instead of a `with` block.
+    return StreamingResponse(
+        content     = response.iter_raw(FILE_STREAM_CHUNK_SIZE),
+        status_code = response.status_code,
+        background  = BackgroundTask(close_upstream),
+    )
 
 
 
