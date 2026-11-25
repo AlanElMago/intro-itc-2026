@@ -1,12 +1,12 @@
 import asyncio
 import logging
-import os
 import socket
 from collections.abc import Generator
 from dataclasses import asdict
 from pathlib import Path
 from typing import Final
 
+import config
 import httpx
 import mylogging
 import uvicorn
@@ -16,18 +16,20 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
 HOSTNAME: Final[str] = socket.gethostname()
-HOST:     Final[str] = os.environ.get('HOST', socket.gethostbyname(HOSTNAME))
-PORT:     Final[str] = os.environ.get('PORT', '42000')
+HOST:     Final[str] = config.HOST
+PORT:     Final[str] = config.PORT
 ADDRESS:  Final[str] = f'{HOST}:{PORT}'
 
 FILE_STREAM_CHUNK_SIZE: Final[int] = 8192
+FILES_DIR = Path(__file__).parent / 'files'
 
 
 
 
 kv = {}
-for file in [f for f in Path('files').iterdir() if f.is_file]:
-    kv[file.name] = ADDRESS
+for file in [f for f in Path(FILES_DIR).iterdir() if f.is_file]:
+    if not file.name.startswith('.'):
+        kv[file.name] = ADDRESS
 
 app = FastAPI()
 dht = asyncio.run(DistributedHashTable.build(initial_kv=kv))
@@ -122,7 +124,7 @@ def get_file(filename: str) -> StreamingResponse:
         raise not_found
 
     if address == ADDRESS:
-        filepath = Path('files') / filename
+        filepath = Path(FILES_DIR) / filename
 
         if not filepath.exists():
             raise not_found
@@ -157,7 +159,7 @@ def main() -> None:
     app.include_router(dht.dht_router)
     app.include_router(dht.chord_router)
 
-    log.info(f'API running on port {PORT}')
+    print(f'API running on {HOST}:{PORT} (Press CTRL+C to quit)')
 
     dht.serve()
 

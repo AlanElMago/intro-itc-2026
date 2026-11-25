@@ -1,5 +1,8 @@
 import logging
+from pathlib import Path
 from typing import Final
+
+LOGS_DIR: Final[str] = str(Path(__file__).parent.resolve() / 'logs')
 
 CONFIG: Final[dict] = {
     'version': 1,
@@ -20,13 +23,13 @@ CONFIG: Final[dict] = {
         'uvicorn': {
             'class':     'logging.FileHandler',
             'formatter': 'default',
-            'filename':  'logs/uvicorn.log',
+            'filename':  f'{LOGS_DIR}/uvicorn.log',
             'mode':      'a',
         },
         'uvicorn.access': {
             'class':     'logging.FileHandler',
             'formatter': 'access',
-            'filename':  'logs/access.log',
+            'filename':  f'{LOGS_DIR}/access.log',
             'mode':      'a',
         },
     },

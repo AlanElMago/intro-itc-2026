@@ -1,19 +1,19 @@
 import hashlib
 import logging
-import os
 import socket
 import threading
 from abc import ABC, abstractmethod
 from typing import Final
 
+import config
 import httpx
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 HOSTNAME: Final[str] = socket.gethostname()
-HOST:     Final[str] = socket.gethostbyname(HOSTNAME)
-PORT:     Final[str] = os.environ.get('PORT', '42000')
+HOST:     Final[str] = config.HOST
+PORT:     Final[str] = config.PORT
 ADDRESS:  Final[str] = f'{HOST}:{PORT}'
 
 NUM_BITS: Final[int] = 16

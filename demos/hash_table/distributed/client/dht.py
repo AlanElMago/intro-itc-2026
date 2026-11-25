@@ -1,18 +1,18 @@
 import asyncio
 import logging
-import os
 import threading
 from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Final
 
+import config
 import httpx
 from chord import Chord, hashfunc
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-JOIN_ADDR: Final[str | None] = os.environ.get('JOIN_ADDR')
+JOIN_ADDR: Final[str | None] = config.JOIN_ADDR
 HTTP_TIMEOUT: Final[httpx.Timeout] = httpx.Timeout(timeout=1.0)
 
 
