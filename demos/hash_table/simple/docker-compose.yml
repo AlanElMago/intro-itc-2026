@@ -1,17 +1,17 @@
 # Test setup: the client talks to hashtable on localhost:8000.
 services:
   hashtable:
-    build: ./hash_table
+    build: ./hashtable
     ports:
       - "8000:8000"
     environment:
-      CLOUD_URL: http://localhost:420000
+      CLOUD_URL: http://localhost:42000
     volumes:
       - ./hashtable/logs:/app/logs
       - ./hashtable/storage:/app/files
 
   simplestorage:
-    build: ./simple_storage
+    build: ./storage
     volumes:
       - ./storage/logs:/app/logs
       - ./storage/storage:/app/files
