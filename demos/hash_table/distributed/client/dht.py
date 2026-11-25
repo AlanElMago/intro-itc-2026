@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import threading
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -11,12 +12,13 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+JOIN_ADDR: Final[str | None] = os.environ.get('JOIN_ADDR')
 HTTP_TIMEOUT: Final[httpx.Timeout] = httpx.Timeout(timeout=1.0)
 
 
 
 
-log = logging.getLogger('api')
+log = logging.getLogger('uvicorn')
 
 
 
@@ -62,9 +64,14 @@ class DistributedHashTable:
     _pred_logs: list[LogRecord]
 
     @property
-    def router(self) -> APIRouter:
+    def dht_router(self) -> APIRouter:
         '''Get the FastAPI router for the distributed hash table.'''
         return self._router
+
+    @property
+    def chord_router(self) -> APIRouter:
+        '''Get the FastAPI router for the Chord protocol.'''
+        return self._chord.router
 
     async def get(self, key: str) -> str | None:
         '''Get the value for a given key from the distributed hash table.
@@ -81,13 +88,13 @@ class DistributedHashTable:
             return self._kv.get(key)
 
         node = self._chord.node.find_successor(id)
-        url  = f'http://{node.frontend_address}/key/{key}'
+        url  = f'http://{node.address}/dht/key/{key}'
 
         try:
             res  = await request('GET', url)
             body = res.json()
         except httpx.HTTPError:
-            log.error(f'Failed to get key {key} from {node.frontend_address}')
+            log.error(f'Failed to get key {key} from {node.address}')
 
             return None
 
@@ -113,13 +120,13 @@ class DistributedHashTable:
             return
 
         node = self._chord.node.find_successor(id)
-        url  = f'http://{node.frontend_address}/key/{key}'
+        url  = f'http://{node.address}/dht/key/{key}'
 
         try:
             _ = await request('PUT', url, json={'value': value})
         except httpx.HTTPError as e:
             log.error(
-                f'Failed to put key {key} to {node.frontend_address}: {e}')
+                f'Failed to put key {key} to {node.address}: {e}')
 
     async def _remove(self, key: str) -> None:
         value = self._kv.pop(key, None)
@@ -142,12 +149,12 @@ class DistributedHashTable:
     async def _sync_pred_logs(self) -> None:
         pred = self._chord.node.predecessor
 
-        if pred is None or pred.frontend_address is None \
-                or pred.frontend_address == self._chord.node.frontend_address:
+        if pred is None or pred.address is None \
+                or pred.address == self._chord.node.address:
             return
 
         offset = len(self._pred_logs)
-        url    = f'http://{pred.frontend_address}/logs'
+        url    = f'http://{pred.address}/dht/logs'
         res    = await request('GET', url, params={'offset': offset})
         res.raise_for_status()
         body   = res.json()
@@ -157,7 +164,7 @@ class DistributedHashTable:
         for log_dict in body['logs']:
             action = KvAction[log_dict['action']]
             record = KvRecord(**log_dict['record'])
-            new_logs.append(LogRecord(action=action, record=record))
+            new_logs.append(LogRecord(action, record))
 
         if new_logs:
             self._pred_logs.extend(new_logs)
@@ -172,7 +179,7 @@ class DistributedHashTable:
 
         try:
             for key, value in self._kv.items():
-                url = f'http://{pred.frontend_address}/key/{key}'
+                url = f'http://{pred.address}/dht/key/{key}'
                 id  = hashfunc(key.encode())
 
                 if not self._chord.node.in_range(id):
@@ -211,13 +218,13 @@ class DistributedHashTable:
     async def _predecessor_changed_handler_loop(self):
         while not self._chord.should_exit.wait(timeout=1.0):
             if self._chord.node.predecessor_changed.is_set():
-                self._pred_logs.clear()
                 await self._move_keys()
+                self._pred_logs.clear()
                 self._chord.node.predecessor_changed.clear()
 
     def serve(self) -> None:
         '''Start the distributed hash table service.'''
-        self._chord.serve()
+        self._chord.start()
 
         threading.Thread(
             target = asyncio.run,
@@ -240,19 +247,11 @@ class DistributedHashTable:
         self._chord.shutdown()
 
     @classmethod
-    async def build(
-        cls,
-        initial_kv:       dict[str, str] | None = None,
-        frontend_address: str | None            = None,
-        join_address:     str | None            = None
-    ) -> 'DistributedHashTable':
+    async def build(cls, initial_kv: dict[str, str] | None = None) -> 'DistributedHashTable':
         '''Build a distributed hash table instance.
 
         Args:
             initial_kv: Initial key-value pairs to populate the DHT.
-            frontend_address: Frontend address for the DHT node.
-            join_address: Chord address (`host:port`) of an existing node to
-                join, or None to start a new ring.
 
         Returns:
             An instance of DistributedHashTable.
@@ -260,25 +259,17 @@ class DistributedHashTable:
         dht    = cls()
         router = APIRouter()
 
-        join_chord: str | None = join_address
-        join_front: str | None = None
-
-        if join_chord is not None:
-            req  = await request('GET', f'http://{join_chord}/addresses')
-            body = req.json()
-            join_front = body.get('frontend_address')
-
         kv:        dict[str, str]  = {}
         self_logs: list[LogRecord] = []
 
-        if join_front is not None and initial_kv is not None:
+        if JOIN_ADDR is not None and initial_kv is not None:
             for key, value in initial_kv.items():
-                url = f'http://{join_front}/key/{key}'
+                url = f'http://{JOIN_ADDR}/dht/key/{key}'
 
                 try:
                     _ = await request('PUT', url, json={'value': value})
                 except httpx.HTTPError as e:
-                    log.error(f'Failed to put key {key} to {join_front}: {e}')
+                    log.error(f'Failed to put key {key} to {JOIN_ADDR}: {e}')
         else:
             kv = (initial_kv or {})
 
@@ -286,7 +277,7 @@ class DistributedHashTable:
                 self_logs.append(
                     LogRecord(action=KvAction.ADD, record=KvRecord(key, value)))
 
-        @router.get('/key/{key}')
+        @router.get('/dht/key/{key}')
         async def get_key(key: str) -> Value:
             value = await dht.get(key)
 
@@ -297,13 +288,13 @@ class DistributedHashTable:
 
             return Value(value=value)
 
-        @router.put('/key/{key}')
+        @router.put('/dht/key/{key}')
         async def put_key(key: str, body: Value) -> Response:
             await dht.put(key, body.value)
 
             return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-        @router.get('/logs')
+        @router.get('/dht/logs')
         async def logs(offset: int) -> JSONResponse:
             if offset < 0 or offset > len(dht._self_logs):
                 detail = f'Offset {offset} out of range'
@@ -323,9 +314,6 @@ class DistributedHashTable:
         dht._router    = router
         dht._self_logs = self_logs
         dht._pred_logs = []
-        dht._chord     = Chord.build(
-            join_address     = join_chord,
-            frontend_address = frontend_address
-        )
+        dht._chord     = Chord.build(join_addr=JOIN_ADDR)
 
         return dht
