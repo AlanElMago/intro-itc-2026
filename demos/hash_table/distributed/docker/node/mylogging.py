@@ -1,8 +1,6 @@
 import logging
 from typing import Final
 
-from starlette.middleware.base import BaseHTTPMiddleware
-
 CONFIG: Final[dict] = {
     'version': 1,
     'disable_existing_loggers': True,
@@ -18,12 +16,6 @@ CONFIG: Final[dict] = {
             'class':   'logging.Formatter',
         },
     },
-    'filters': {
-        'exclude_paths': {
-            '()': 'mylogging.ExcludePaths',
-            'paths': ['/health', '/notify', '/predecessor', '/logs'],
-        },
-    },
     'handlers': {
         'uvicorn': {
             'class':     'logging.FileHandler',
@@ -31,30 +23,10 @@ CONFIG: Final[dict] = {
             'filename':  'logs/uvicorn.log',
             'mode':      'a',
         },
-        'chord.access': {
+        'uvicorn.access': {
             'class':     'logging.FileHandler',
             'formatter': 'access',
-            'filters':   ['exclude_paths'],
-            'filename':  'logs/chord_access.log',
-            'mode':      'a',
-        },
-        'chord.app': {
-            'class':     'logging.FileHandler',
-            'formatter': 'default',
-            'filename':  'logs/chord_app.log',
-            'mode':      'a',
-        },
-        'api.access': {
-            'class':     'logging.FileHandler',
-            'formatter': 'access',
-            'filters':   ['exclude_paths'],
-            'filename':  'logs/api_access.log',
-            'mode':      'a',
-        },
-        'api.app': {
-            'class':     'logging.FileHandler',
-            'formatter': 'default',
-            'filename':  'logs/api_app.log',
+            'filename':  'logs/access.log',
             'mode':      'a',
         },
     },
@@ -65,68 +37,38 @@ CONFIG: Final[dict] = {
             'propagate': False,
             'qualname':  'uvicorn',
         },
-        'chord': {
+        'uvicorn.access': {
             'level':     'INFO',
-            'handlers':  ['chord.app'],
+            'handlers':  ['uvicorn.access'],
             'propagate': False,
-            'qualname':  'chord',
+            'qualname':  'uvicorn.access',
         },
-        'chord.access': {
+        'uvicorn.error': {
             'level':     'INFO',
-            'handlers':  ['chord.access'],
+            'handlers':  ['uvicorn'],
             'propagate': False,
-            'qualname':  'chord.access',
+            'qualname':  'uvicorn.error',
         },
-        'chord.error': {
-            'level':     'WARNING',
-            'handlers':  ['chord.app'],
-            'propagate': False,
-            'qualname':  'chord.error',
-        },
-        'api': {
-            'level':     'INFO',
-            'handlers':  ['api.app'],
-            'propagate': False,
-            'qualname':  'api',
-        },
-        'api.access': {
-            'level':     'INFO',
-            'handlers':  ['api.access'],
-            'propagate': False,
-            'qualname':  'api.access',
-        },
-        'api.error': {
-            'level':     'WARNING',
-            'handlers':  ['api.app'],
-            'propagate': False,
-            'qualname':  'api.error',
-        },
-    },
+    }
 }
 
 
 
 
-class AccessLog(BaseHTTPMiddleware):
-    def __init__(self, app, log: logging.Logger):
-        super().__init__(app)
-        self.log = log
-
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        client   = f'{request.client.host}:{request.client.port}' \
-                   if request.client else '-'
-
-        self.log.info('%s - "%s %s" %d',
-            client, request.method, request.url.path, response.status_code,
-            extra={'path': request.url.path})
-
-        return response
-
-class ExcludePaths(logging.Filter):
-    def __init__(self, paths: list[str]):
-        super().__init__()
-        self.paths = set(paths)
+class PathsFilter(logging.Filter):
+    def __init__(self, name: str="", paths: list[str] | None=None) -> None:
+        super().__init__(name)
+        self.paths = paths
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return getattr(record, 'path', None) not in self.paths
+        if self.paths is None:
+            return True
+
+        if isinstance(record.args, tuple) and len(record.args) >= 3:
+            request_path = str(record.args[2])
+
+            for path in self.paths:
+                if request_path.startswith(path):
+                    return False
+
+        return True

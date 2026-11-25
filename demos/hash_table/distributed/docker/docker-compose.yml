@@ -7,16 +7,15 @@ services:
     container_name: chord_node_0
     command: python main.py
     environment:
-      - CHORD_PORT=42000
-      - API_PORT=43000
+      - PORT=42000
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42000/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43000:43000
+      - 42000:42000
     volumes:
       - ./mounts/node0/logs:/app/logs
       - ./mounts/node0/files:/app/files
@@ -28,16 +27,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node0:42000"
-      - CHORD_PORT=42001
-      - API_PORT=43001
+      - PORT=42001
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43001/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42001/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43001:43001
+      - 42001:42001
     volumes:
       - ./mounts/node1/logs:/app/logs
       - ./mounts/node1/files:/app/files
@@ -52,16 +50,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node1:42001"
-      - CHORD_PORT=42002
-      - API_PORT=43002
+      - PORT=42002
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43002/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42002/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43002:43002
+      - 42002:42002
     volumes:
       - ./mounts/node2/logs:/app/logs
       - ./mounts/node2/files:/app/files
@@ -76,16 +73,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node2:42002"
-      - CHORD_PORT=42003
-      - API_PORT=43003
+      - PORT=42003
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43003/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42003/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43003:43003
+      - 42003:42003
     volumes:
       - ./mounts/node3/logs:/app/logs
       - ./mounts/node3/files:/app/files
@@ -100,16 +96,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node3:42003"
-      - CHORD_PORT=42004
-      - API_PORT=43004
+      - PORT=42004
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43004/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42004/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43004:43004
+      - 42004:42004
     volumes:
       - ./mounts/node4/logs:/app/logs
       - ./mounts/node4/files:/app/files
@@ -124,16 +119,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node4:42004"
-      - CHORD_PORT=42005
-      - API_PORT=43005
+      - PORT=42005
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43005/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42005/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43005:43005
+      - 42005:42005
     volumes:
       - ./mounts/node5/logs:/app/logs
       - ./mounts/node5/files:/app/files
@@ -148,16 +142,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node5:42005"
-      - CHORD_PORT=42006
-      - API_PORT=43006
+      - PORT=42006
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43006/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42006/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43006:43006
+      - 42006:42006
     volumes:
       - ./mounts/node6/logs:/app/logs
       - ./mounts/node6/files:/app/files
@@ -172,16 +165,15 @@ services:
     command: python main.py
     environment:
       - "JOIN_ADDR=node6:42006"
-      - CHORD_PORT=42007
-      - API_PORT=43007
+      - PORT=42007
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:43007/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:42007/chord/health')"]
       start_period: 5s
       interval: 5s
       timeout: 5s
       retries: 3
     ports:
-      - 43007:43007
+      - 42007:42007
     volumes:
       - ./mounts/node7/logs:/app/logs
       - ./mounts/node7/files:/app/files

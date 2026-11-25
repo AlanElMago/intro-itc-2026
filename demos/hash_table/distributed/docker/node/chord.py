@@ -7,15 +7,13 @@ from abc import ABC, abstractmethod
 from typing import Final
 
 import httpx
-import mylogging
-import uvicorn
-from fastapi import APIRouter, FastAPI, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 HOSTNAME: Final[str] = socket.gethostname()
 HOST:     Final[str] = socket.gethostbyname(HOSTNAME)
-PORT:     Final[str] = os.environ.get('CHORD_PORT', '42000')
+PORT:     Final[str] = os.environ.get('PORT', '42000')
 ADDRESS:  Final[str] = f'{HOST}:{PORT}'
 
 NUM_BITS: Final[int] = 16
@@ -25,7 +23,7 @@ HASH_ALG: Final[str] = 'sha1'
 
 
 
-log = logging.getLogger('chord')
+log = logging.getLogger('uvicorn')
 
 
 
@@ -67,12 +65,11 @@ def in_range(id: int, a: int, b: int) -> bool:
 
 
 
-class Addresses(BaseModel):
+class Address(BaseModel):
     '''Pydantic model representing the addresses of a node in the Chord
     network.
     '''
-    chord_address:    str
-    frontend_address: str | None = None
+    address: str
 
 
 
@@ -87,17 +84,8 @@ class Node(ABC):
 
     @property
     @abstractmethod
-    def chord_address(self) -> str:
-        '''Return the network address of the node in the Chord ring, which is
-        used for inter-node communication.
-        '''
-
-    @property
-    @abstractmethod
-    def frontend_address(self) -> str | None:
-        '''Return the frontend address of the node, which is used for client
-        interactions.
-        '''
+    def address(self) -> str:
+        '''Return the network address of the node in the Chord ring.'''
 
     @property
     @abstractmethod
@@ -157,33 +145,27 @@ class RemoteNode(Node):
     '''Represents a remote node in the Chord network, allowing interaction with
     it through HTTP requests.
     '''
-    _chord_address:    str
-    _frontend_address: str | None
-
+    _address:    str
     _client: httpx.Client
 
     @property
     def id(self) -> int:
-        return hashfunc(self._chord_address.encode())
+        return hashfunc(self.address.encode())
 
     @property
-    def chord_address(self) -> str:
-        return self._chord_address
-
-    @property
-    def frontend_address(self) -> str | None:
-        return self._frontend_address
+    def address(self) -> str:
+        return self._address
 
     @property
     def successor(self) -> Node:
-        url = f'http://{self.chord_address}/successor'
+        url = f'http://{self.address}/chord/successor'
         res = self._client.get(url)
 
         return RemoteNode.from_dict(res.json(), self._client)
 
     @property
     def predecessor(self) -> Node | None:
-        url = f'http://{self.chord_address}/predecessor'
+        url = f'http://{self.address}/chord/predecessor'
         res = self._client.get(url)
 
         if res.status_code == status.HTTP_404_NOT_FOUND:
@@ -192,30 +174,26 @@ class RemoteNode(Node):
         return RemoteNode.from_dict(res.json(), self._client)
 
     def find_successor(self, id: int) -> Node:
-        url = f'http://{self.chord_address}/find-successor/{id}'
+        url = f'http://{self.address}/chord/find-successor/{id}'
         res = self._client.get(url)
 
         return RemoteNode.from_dict(res.json(), self._client)
 
     def closest_preceding_node(self, id: int) -> Node:
-        url = f'http://{self.chord_address}/closest-preceding-node/{id}'
+        url = f'http://{self.address}/chord/closest-preceding-node/{id}'
         res = self._client.get(url)
 
         return RemoteNode.from_dict(res.json(), self._client)
 
     def notify(self, n: Node) -> None:
-        url = f'http://{self.chord_address}/notify'
-        _   = self._client.put(url, json={
-            'chord_address':    n.chord_address,
-            'frontend_address': n.frontend_address
-        })
+        url = f'http://{self.address}/chord/notify'
+        _   = self._client.put(url, json={'address': n.address})
 
     @classmethod
     def from_dict(cls, d: dict, client: httpx.Client) -> Node:
         n = cls()
 
-        n._chord_address    = d['chord_address']
-        n._frontend_address = d['frontend_address']
+        n._address= d['address']
         n._client = client
 
         return n
@@ -238,8 +216,6 @@ class SelfNode(Node):
     local node has a new predecessor in the Chord ring.
     '''
 
-    _frontend_address: str | None
-
     _pred:    Node | None
     _client:  httpx.Client
     _fingers: list[Node]
@@ -249,12 +225,8 @@ class SelfNode(Node):
         return hashfunc(ADDRESS.encode())
 
     @property
-    def chord_address(self) -> str:
+    def address(self) -> str:
         return ADDRESS
-
-    @property
-    def frontend_address(self) -> str | None:
-        return self._frontend_address
 
     @property
     def successor(self) -> Node:
@@ -268,11 +240,11 @@ class SelfNode(Node):
         old = self._pred
         self._pred = n
 
-        if n is None or n.chord_address == self.chord_address:
+        if n is None or n.address == self.address:
             return
 
-        if old is None or old.chord_address != n.chord_address:
-            log.info(f'Predecessor changed to {n.chord_address}')
+        if old is None or old.address != n.address:
+            log.info(f'Predecessor changed to {n.address}')
             self.predecessor_changed.set()
 
     def in_range(self, id: int) -> bool:
@@ -359,7 +331,7 @@ class SelfNode(Node):
         if self.predecessor is None:
             return
 
-        url = f'http://{self.predecessor.chord_address}/health'
+        url = f'http://{self.predecessor.address}/chord/health'
 
         try:
             res   = self._client.get(url)
@@ -368,7 +340,7 @@ class SelfNode(Node):
             alive = False
 
         if not alive:
-            log.info(f'Predecessor {self.predecessor.chord_address} failed')
+            log.info(f'Predecessor {self.predecessor.address} failed')
 
             self._set_predecessor(None)
             self.predecessor_failed.set()
@@ -377,8 +349,7 @@ class SelfNode(Node):
     def from_dict(cls, d: dict, client: httpx.Client) -> Node:
         n = RemoteNode()
 
-        n._chord_address    = d['chord_address']
-        n._frontend_address = d['frontend_address']
+        n._address = d['address']
         n._client  = client
 
         return n
@@ -396,7 +367,7 @@ class Chord:
     '''Event that is set when the Chord node should exit, signaling all loops
     to terminate.'''
 
-    _server: uvicorn.Server
+    _router: APIRouter
 
     @property
     def hostname(self) -> str:
@@ -407,6 +378,13 @@ class Chord:
     def modulo(self) -> int:
         '''Return the modulo value used for hashing in the Chord ring.'''
         return MODULO
+
+    @property
+    def router(self) -> APIRouter:
+        '''Return the FastAPI router for this Chord node, which includes all
+        the HTTP endpoints needed for the Chord protocol.
+        '''
+        return self._router
 
     def _stabilize_loop(self) -> None:
         while not self.should_exit.wait(timeout=1.0):
@@ -423,10 +401,8 @@ class Chord:
         while not self.should_exit.wait(timeout=1.0):
             self.node.check_predecessor()
 
-    def serve(self) -> None:
-        '''Start the Uvicorn server for the Chord node.'''
-        threading.Thread(
-            target=self._server.run, daemon=True).start()
+    def start(self) -> None:
+        '''Start the background processes for the Chord node.'''
         threading.Thread(
             target=self._stabilize_loop, daemon=True).start()
         threading.Thread(
@@ -434,30 +410,22 @@ class Chord:
         threading.Thread(
             target=self._check_predecessor_loop, daemon=True).start()
 
-        log.info(f'Chord running at {self.node.chord_address} ' \
-                 f'with id {self.node.id}')
+        log.info(
+            f'Chord running at {self.node.address} with id {self.node.id}')
 
     def shutdown(self) -> None:
-        '''Stop the Uvicorn server for the Chord node.'''
+        '''Stop the running background processes for the Chord node.'''
         self.should_exit.set()
-        self._server.should_exit = True
 
         log.info('Chord shutting down')
 
     @classmethod
-    def build(
-        cls,
-        join_address:     str | None = None,
-        frontend_address: str | None = None
-    ) -> 'Chord':
+    def build(cls, join_addr: str | None = None) -> 'Chord':
         '''Build a Chord instance.
 
         Args:
-            join_chord: The chord address of an existing node to join, or None
+            join_addr: The chord address of an existing node to join, or None
             to create a new ring.
-            join_front: The frontend address of the existing node to join, or
-            None if not applicable.
-            frontend_address: The frontend address for client interactions.
 
         Returns:
             An instance of Chord.
@@ -473,42 +441,28 @@ class Chord:
         node._pred    = None
         node._client  = client
         node._fingers = [node] * NUM_BITS
-        node._frontend_address   = frontend_address
         node.predecessor_changed = threading.Event()
         node.predecessor_failed  = threading.Event()
 
-        if join_address is None:
+        if join_addr is None:
             node.create()
         else:
-            node.join(n=RemoteNode.from_dict({
-                'chord_address':    join_address,
-                'frontend_address': None
-            }, client))
+            node.join(n=RemoteNode.from_dict({'address': join_addr}, client))
 
         router = APIRouter()
 
-        @router.get('/health')
+        @router.get('/chord/health')
         def health() -> JSONResponse:
             content = {'status': 'ok'}
 
             return JSONResponse(content, status.HTTP_200_OK)
 
-        @router.get('/addresses')
-        def addresses() -> Addresses:
-            return Addresses(
-                chord_address    = node.chord_address,
-                frontend_address = node.frontend_address
-            )
+        @router.get('/chord/successor')
+        def successor() -> Address:
+            return Address(address=node.successor.address)
 
-        @router.get('/successor')
-        def successor() -> Addresses:
-            return Addresses(
-                chord_address    = node.successor.chord_address,
-                frontend_address = node.successor.frontend_address
-            )
-
-        @router.get('/predecessor')
-        def predecessor() -> Addresses:
+        @router.get('/chord/predecessor')
+        def predecessor() -> Address:
             pred = node.predecessor
 
             if pred is None:
@@ -516,35 +470,23 @@ class Chord:
 
                 raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
 
-            return Addresses(
-                chord_address    = pred.chord_address,
-                frontend_address = pred.frontend_address
-            )
+            return Address(address=pred.address)
 
-        @router.get('/find-successor/{id}')
-        def find_successor(id: int) -> Addresses:
+        @router.get('/chord/find-successor/{id}')
+        def find_successor(id: int) -> Address:
             succ = node.find_successor(id)
 
-            return Addresses(
-                chord_address    = succ.chord_address,
-                frontend_address = succ.frontend_address
-            )
+            return Address(address=succ.address)
 
-        @router.get('/closest-preceding-node/{id}')
-        def closest_preceding_node(id: int) -> Addresses:
+        @router.get('/chord/closest-preceding-node/{id}')
+        def closest_preceding_node(id: int) -> Address:
             n = node.closest_preceding_node(id)
 
-            return Addresses(
-                chord_address    = n.chord_address,
-                frontend_address = n.frontend_address
-            )
+            return Address(address=n.address)
 
-        @router.put('/notify')
-        def notify(body: Addresses) -> JSONResponse:
-            n = RemoteNode.from_dict({
-                'chord_address':    body.chord_address,
-                'frontend_address': body.frontend_address
-            }, client)
+        @router.put('/chord/notify')
+        def notify(body: Address) -> JSONResponse:
+            n = RemoteNode.from_dict({'address': body.address}, client)
 
             node.notify(n)
 
@@ -552,25 +494,10 @@ class Chord:
 
             return JSONResponse(content, status.HTTP_200_OK)
 
-        app = FastAPI()
-        app.include_router(router)
-        app.add_middleware(
-            mylogging.AccessLog, log=logging.getLogger('chord.access'))
-
-        server = uvicorn.Server(
-            config = uvicorn.Config(
-                    app        = app,
-                    host       = '0.0.0.0',
-                    port       = int(PORT),
-                    log_config = None,
-                    access_log = False
-            )
-        )
-
         chord = cls()
 
         chord.node        = node
-        chord._server     = server
         chord.should_exit = threading.Event()
+        chord._router     = router
 
         return chord
